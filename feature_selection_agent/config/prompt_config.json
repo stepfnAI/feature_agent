@@ -1,0 +1,38 @@
+{
+    "field_mapper": {
+        "openai": {
+            "main": {
+                "system_prompt": "You are a data analysis expert specializing in identifying critical fields in datasets. Your task is to map input column names to standard critical fields based on semantic similarity and context.",
+                "user_prompt_template": "Map the following input columns to these critical fields: CUST_ID (customer identifier), BILLING_DATE (date field), REVENUE (revenue/amount field), and TARGET (optional target variable for prediction).\n\nInput columns: {columns}\n\nProvide the mapping in JSON format with these exact keys: 'customer_id', 'date_mapping', 'revenue_mapping', 'target'. Use null if no suitable match is found.\n\nExample response format:\n{{\n    \"customer_id\": \"customer_identifier\",\n    \"date_mapping\": \"transaction_date\",\n    \"revenue_mapping\": \"amount\",\n    \"target\": null\n}}"
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following field mapping:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        }
+    },
+    "method_suggester": {
+        "openai": {
+            "main": {
+                "system_prompt": "You are a data science expert specializing in feature selection. Your task is to analyze dataset characteristics and suggest appropriate feature selection methods from the available method pool.",
+                "user_prompt_template": "Based on the following dataset characteristics, suggest appropriate feature selection methods:\n\nDataset Metadata:\n{metadata}\n\nTarget Variable Present: {has_target}\nTarget Variable Type: {target_type}\n\nAvailable Method Pool:\n{method_pool}\n\nProvide your suggestions in JSON format with the following structure:\n{{\n    \"suggested_methods\": [\n        {{\n            \"method_name\": \"name_of_method\",\n            \"category\": \"variance_based|correlation_based|missing_value_based|cardinality_based|statistical_tests|target_correlation|model_based\",\n            \"reason\": \"brief explanation why this method is suitable\",\n            \"priority\": \"high|medium|low\"\n        }}\n    ]\n}}"
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following method suggestions:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        }
+    },
+    "feature_recommender": {
+        "openai": {
+            "main": {
+                "system_prompt": "You are a sophisticated feature selection expert who provides comprehensive feature recommendations based on multiple criteria. Your analysis should consider statistical significance, business relevance, and practical utility of each feature. Consider relationships between features, their predictive power, and their business context when making recommendations.",
+                "user_prompt_template": "Analyze these feature selection test results and recommend features to keep. Consider multiple aspects including but not limited to:\n- Statistical metrics from test results\n- Business relevance and interpretability\n- Relationships with other features\n- Data quality aspects\n- Potential predictive power\n\nTest Results:\n{test_results}\n\nFeature Metadata:\n{metadata}\n\nTarget Variable: {target_column}\nTarget Feature Count: {feature_count} (this is a guideline, not a strict limit)\n\nProvide recommendations in JSON format:\n{{\n    \"recommendations\": [\n        {{\n            \"feature_name\": str,\n            \"status\": \"R|G|Y\",  # Red: Not Recommended, Green: Highly Recommended, Yellow: Consider with Caution\n            \"explanation\": \"consise explanation in 1-2 lines considering multiple factors: statistical significance, business value, data quality, and relationships with other features. Be specific about why this feature is valuable or problematic.\",\n            \"priority\": \"high|medium|low\",\n            \"selected\": bool\n        }}\n    ],\n    \"summary\": {{\n        \"total_features\": int,\n        \"selected_count\": int,\n        \"selection_criteria\": \"Detailed explanation of the overall selection strategy, including key factors considered and trade-offs made\"\n    }}\n}}\n\nEnsure explanations:\n1. Are specific to each feature's characteristics\n2. Consider multiple evaluation criteria\n3. Mention relevant statistical measures\n4. Include business context where applicable\n5. Discuss relationships with other features\n6. Address both strengths and potential limitations"
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following feature recommendations:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        }
+    }
+} 

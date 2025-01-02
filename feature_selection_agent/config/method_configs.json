@@ -1,0 +1,120 @@
+{
+    "methods_without_target": [
+        {
+            "name": "variance_threshold",
+            "category": "variance_based",
+            "description": "Removes numerical features with low variance. Useful for eliminating constant or near-constant features.",
+            "requires_target": false
+        },
+        {
+            "name": "quasi_constant_removal",
+            "category": "variance_based",
+            "description": "Identifies and removes features where one value dominates (>99%). Works with both numerical and categorical features.",
+            "requires_target": false
+        },
+        {
+            "name": "pearson_correlation",
+            "category": "correlation_based",
+            "description": "Identifies highly correlated numerical features to remove redundancy. Best for linear relationships.",
+            "requires_target": false
+        },
+        {
+            "name": "spearman_correlation",
+            "category": "correlation_based",
+            "description": "Measures monotonic relationships between features. Useful for non-linear but consistent relationships.",
+            "requires_target": false
+        },
+        {
+            "name": "kendall_correlation",
+            "category": "correlation_based",
+            "description": "Similar to spearman but better for small samples and ordinal data. More robust against outliers.",
+            "requires_target": false
+        },
+        {
+            "name": "cramer_v",
+            "category": "correlation_based",
+            "description": "Measures association between categorical variables. Perfect for identifying redundant categorical features.",
+            "requires_target": false
+        },
+        {
+            "name": "missing_ratio_threshold",
+            "category": "missing_value_based",
+            "description": "Removes features with high percentage of missing values. Essential for ensuring data quality.",
+            "requires_target": false
+        },
+        {
+            "name": "unique_value_ratio",
+            "category": "cardinality_based",
+            "description": "Identifies features with too many unique values. Useful for detecting ID-like columns.",
+            "requires_target": false
+        },
+        {
+            "name": "low_variance_categories",
+            "category": "cardinality_based",
+            "description": "Removes categorical features where one category dominates. Similar to variance threshold for categories.",
+            "requires_target": false
+        }
+    ],
+    "methods_with_target": [
+        {
+            "name": "chi_square_test",
+            "category": "statistical_tests",
+            "description": "Measures dependency between categorical features and target. Ideal for classification problems.",
+            "requires_target": true
+        },
+        {
+            "name": "anova_f_test",
+            "category": "statistical_tests",
+            "description": "Tests relationship between numerical features and categorical target. Best for classification tasks.",
+            "requires_target": true
+        },
+        {
+            "name": "mutual_information",
+            "category": "statistical_tests",
+            "description": "Measures dependency between any feature type and target. Excellent for capturing non-linear relationships.",
+            "requires_target": true
+        },
+        {
+            "name": "information_value",
+            "category": "statistical_tests",
+            "description": "Measures predictive power of features for binary classification. Particularly useful in risk modeling.",
+            "requires_target": true
+        },
+        {
+            "name": "pearson_with_target",
+            "category": "target_correlation",
+            "description": "Measures linear correlation with numerical target. Best for regression problems.",
+            "requires_target": true
+        },
+        {
+            "name": "spearman_with_target",
+            "category": "target_correlation",
+            "description": "Measures monotonic correlation with target. Useful for non-linear relationships in regression.",
+            "requires_target": true
+        },
+        {
+            "name": "point_biserial",
+            "category": "target_correlation",
+            "description": "Measures correlation between numerical features and binary target. Specifically for binary classification.",
+            "requires_target": true
+        },
+        {
+            "name": "random_forest_importance",
+            "category": "model_based",
+            "description": "Uses random forest to score feature importance. Excellent for capturing complex relationships.",
+            "requires_target": true
+        },
+        {
+            "name": "lasso_selection",
+            "category": "model_based",
+            "description": "Uses L1 regularization to eliminate irrelevant features. Great for linear models and sparse feature sets.",
+            "requires_target": true
+        },
+        {
+            "name": "xgboost_importance",
+            "category": "model_based",
+            "description": "Uses gradient boosting to score features. Similar to random forest but often better for structured data.",
+            "requires_target": true
+        }
+    ]
+} 
