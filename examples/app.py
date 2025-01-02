@@ -559,9 +559,12 @@ class FeatureSelectionApp:
                 "Status": {"G": "GREEN", "Y": "YELLOW", "R": "RED"}[rec["status"]]
             })
         
-        # Convert to DataFrame
+        # Convert to DataFrame and sort by Status (GREEN > YELLOW > RED)
         import pandas as pd
         df_table = pd.DataFrame(table_data)
+        status_order = ["GREEN", "YELLOW", "RED"]
+        df_table["Status_Order"] = pd.Categorical(df_table["Status"], categories=status_order, ordered=True)
+        df_table = df_table.sort_values("Status_Order").drop("Status_Order", axis=1)
         
         # Display interactive table with checkboxes
         for idx, row in df_table.iterrows():
@@ -570,8 +573,11 @@ class FeatureSelectionApp:
                 is_selected = self.view.checkbox("", 
                                               value=row["Selected"] == "✅",
                                               key=f"checkbox_{idx}",
-                                              label_visibility="collapsed")  # Simplified key
-                recommendations["recommendations"][idx]["selected"] = is_selected
+                                              label_visibility="collapsed")
+                # Find the original index in recommendations to update
+                original_idx = next(i for i, rec in enumerate(recommendations["recommendations"]) 
+                                  if rec["feature_name"] == row["Feature Name"])
+                recommendations["recommendations"][original_idx]["selected"] = is_selected
             with col2:
                 self.view.display_markdown(f"**{row['Feature Name']}**")
             with col3:

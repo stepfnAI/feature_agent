@@ -22,21 +22,22 @@ class SFNMethodSuggesterAgent(SFNAgent):
         self.prompt_manager = SFNPromptManager(prompt_config_path)
         
         # Load method configurations
-        with open(method_config_path, 'r') as f:
-            self.method_pool = json.load(f)
+        try:
+            with open(method_config_path, 'r') as f:
+                self.method_pool = json.load(f)
+            print(f">>> Successfully loaded method pool with {len(self.method_pool.get('methods_without_target', []))} methods without target")
+            print(f">>> and {len(self.method_pool.get('methods_with_target', []))} methods with target")
+        except Exception as e:
+            print(f">>> Error loading method configs: {str(e)}")
+            raise
         
     def execute_task(self, task: Task) -> Dict:
         """
         Suggests feature selection methods based on dataset characteristics
-        
-        :param task: Task object containing:
-            - data: Dict containing:
-                - dataframe: pandas DataFrame
-                - metadata: Dict of feature metadata
-                - target_column: str or None
-                - target_type: str or None
-        :return: Dictionary with suggested methods
         """
+        print(">>> Starting execute_task in MethodSuggesterAgent")  # Debug log
+        print(f">>> Task data keys: {task.data.keys() if isinstance(task.data, dict) else 'Not a dict'}")  # Debug log
+        
         # Check if data is a dictionary and contains a dataframe
         if not isinstance(task.data, dict) or not isinstance(task.data.get('dataframe'), pd.DataFrame):
             raise ValueError("Task data must be a dictionary containing a pandas DataFrame under 'dataframe' key")
@@ -44,27 +45,41 @@ class SFNMethodSuggesterAgent(SFNAgent):
         metadata = task.data.get('metadata', {})
         target_column = task.data.get('target_column')
         
+        print(f">>> Metadata: {metadata}")  # Debug log
+        print(f">>> Target column: {target_column}")  # Debug log
+        
         suggestions = self._suggest_methods(
             metadata=metadata,
             has_target=target_column is not None,
             target_type=task.data.get('target_type')
         )
+        print(f">>> Generated suggestions: {suggestions}")  # Debug log
         return suggestions
 
     def _suggest_methods(self, metadata: Dict, has_target: bool, target_type: str = None) -> Dict:
         """
         Suggest appropriate feature selection methods
         """
+        print(">>> Starting _suggest_methods")  # Debug log
+        print(f">>> Input params - metadata: {metadata}, has_target: {has_target}, target_type: {target_type}")  # Debug log
+        
         # Get prompts using PromptManager
-        system_prompt, user_prompt = self.prompt_manager.get_prompt(
-            agent_type='method_suggester',
-            llm_provider=self.llm_provider,
-            prompt_type='main',
-            metadata=json.dumps(metadata, indent=2),
-            has_target=has_target,
-            target_type=target_type or "None",
-            method_pool=json.dumps(self.method_pool, indent=2)
-        )
+        try:
+            system_prompt, user_prompt = self.prompt_manager.get_prompt(
+                agent_type='method_suggester',
+                llm_provider=self.llm_provider,
+                prompt_type='main',
+                metadata=json.dumps(metadata, indent=2),
+                has_target=has_target,
+                target_type=target_type or "None",
+                method_pool=json.dumps(self.method_pool, indent=2)
+            )
+            print(">>> Successfully got prompts")  # Debug log
+            print(f">>> System prompt: {system_prompt}")  # Debug log
+            print(f">>> User prompt: {user_prompt}")  # Debug log
+        except Exception as e:
+            print(f">>> Error getting prompts: {str(e)}")  # Debug log
+            raise
 
         # Get provider config or use default if not found
         provider_config = self.model_config.get(self.llm_provider, {
@@ -74,6 +89,7 @@ class SFNMethodSuggesterAgent(SFNAgent):
             "n": 1,
             "stop": None
         })
+        print(f">>> Using provider config: {provider_config}")  # Debug log
         
         # Prepare the configuration for the API call
         configuration = {
@@ -123,31 +139,53 @@ class SFNMethodSuggesterAgent(SFNAgent):
         """
         Validate and normalize the suggested methods
         """
+        print(">>> Starting validation")  # Debug log
+        print(f">>> Suggestions to validate: {suggestions}")  # Debug log
+        
         if not isinstance(suggestions, dict) or "suggested_methods" not in suggestions:
+            print(">>> Invalid suggestions format")  # Debug log
             return {"suggested_methods": []}
             
         validated_methods = []
-        for method in suggestions["suggested_methods"]:
-            if self._is_valid_method(method, has_target):
-                validated_methods.append(method)
-                
-        return {"suggested_methods": validated_methods}
+        method_pool_key = "methods_with_target" if has_target else "methods_without_target"
+        available_methods = self.method_pool.get(method_pool_key, [])
         
+        # Create a map of available method names for quick lookup
+        available_method_names = {method["name"]: method for method in available_methods}
+        print(f">>> Available methods: {list(available_method_names.keys())}")  # Debug log
+        
+        for method in suggestions["suggested_methods"]:
+            try:
+                # Check required keys
+                if not all(key in method for key in ["method_name", "category", "reason", "priority"]):
+                    print(f">>> Missing required keys in method: {method}")  # Debug log
+                    continue
+                    
+                # Check if method exists in method pool
+                if method["method_name"] in available_method_names:
+                    # Verify the category matches
+                    pool_method = available_method_names[method["method_name"]]
+                    if method["category"] == pool_method["category"]:
+                        validated_methods.append(method)
+                        print(f">>> Validated method: {method['method_name']}")  # Debug log
+                    else:
+                        print(f">>> Category mismatch for method: {method['method_name']}")  # Debug log
+                else:
+                    print(f">>> Method not found in pool: {method['method_name']}")  # Debug log
+                    
+            except Exception as e:
+                print(f">>> Error validating method {method}: {str(e)}")  # Debug log
+                continue
+        
+        print(f">>> Validation complete. Valid methods: {len(validated_methods)}")  # Debug log
+        return {"suggested_methods": validated_methods}
+
     def _is_valid_method(self, method: Dict, has_target: bool) -> bool:
         """
         Validate individual method suggestion
         """
-        required_keys = ["method_name", "category", "reason", "priority"]
-        if not all(key in method for key in required_keys):
-            return False
-            
-        # Check if method exists in method pool
-        method_category = "with_target" if has_target else "without_target"
-        available_methods = []
-        for category in self.method_pool[method_category].values():
-            available_methods.extend(category.keys())
-            
-        return method["method_name"] in available_methods
+        # This method is now handled within _validate_suggestions
+        return True
 
     def get_validation_params(self, response, task):
         """
