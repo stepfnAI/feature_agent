@@ -1,15 +1,22 @@
-# Column Mapping Advisor
+# Feature Selection Advisor
 
-An AI-powered column mapping tool that intelligently maps your dataset columns to standardized column names, with interactive mapping capabilities and category-based standardization.
+An AI-powered feature selection tool that intelligently analyzes your dataset and recommends optimal features through multiple selection methods, with interactive selection capabilities and comprehensive feature analysis.
 
 ## 🌟 Features
 
-- **Intelligent Category Detection**: Automatically identifies dataset category (billing, usage, support)
-- **Smart Column Mapping**: Generates contextual column mapping suggestions
-- **Interactive Mapping**: Review and modify AI-suggested mappings
+- **Intelligent Feature Analysis**: Automatically analyzes and classifies features
+- **Smart Method Selection**: AI-powered selection of appropriate feature selection methods
+- **Multi-Method Approach**: Combines multiple feature selection techniques:
+  - Variance-based methods
+  - Correlation analysis
+  - Statistical tests
+  - Model-based importance
+  - Missing value analysis
+  - Cardinality checks
+- **Interactive Selection**: Review and modify AI-suggested feature selections
 - **Flexible Data Input**: Supports multiple file formats (CSV, Excel, JSON, Parquet)
-- **Visual Progress Tracking**: Clear feedback on mapping progress
-- **Data Export**: Download mapped data in CSV format
+- **Visual Progress Tracking**: Clear feedback on selection process
+- **Data Export**: Download processed dataset with selected features
 
 ## 🚀 Getting Started
 
@@ -23,8 +30,8 @@ An AI-powered column mapping tool that intelligently maps your dataset columns t
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/stepfnAI/mapping_agent.git
-cd mapping_agent
+git clone git@github.com:stepfnAI/feature_agent.git
+cd feature_agent
 ```
 
 2. Create and activate a virtual environment using virtualenv:
@@ -62,24 +69,25 @@ streamlit run .\examples\app.py
    - Preview the loaded data
    - Reset functionality available at any point
 
-2. **Category Identification**
-   - AI automatically analyzes and suggests dataset category
-   - Options to:
-     - Confirm AI suggestion
-     - Select different category (Billing, Usage, Support)
+2. **Field Mapping and Classification**
+   - AI identifies critical fields (CUST_ID, BILLING_DATE, REVENUE, TARGET)
+   - Automatic feature classification and metadata generation
+   - Interactive review and modification of mappings
 
-3. **Column Mapping**
-   - AI suggests mappings based on standard columns
-   - Interactive review and modification with:
-     - Visual indicators for mandatory columns (\#)
-     - Dropdown selection for each column mapping
-     - Option to map additional standard columns
-     - Validation for mandatory column mappings
-   - Mapping confirmation only possible after all mandatory columns are mapped
+3. **Feature Selection Methods**
+   - AI suggests appropriate selection methods based on data characteristics
+   - Methods available for both with and without target variable
+   - Interactive method selection with AI recommendations
 
-4. **Post Processing**
+4. **Feature Selection**
+   - Comprehensive feature analysis using selected methods
+   - AI-powered recommendations with explanations
+   - Interactive feature selection interface
+   - Visual indicators for feature importance
+
+5. **Post Processing**
    - Three operation options:
-     - View mapped data
+     - View selected features
      - Download processed dataset (CSV format)
      - Finish and reset application
 
@@ -87,10 +95,11 @@ streamlit run .\examples\app.py
 
 The application follows a modular architecture with these key components:
 
-- **SFNCategoryIdentificationAgent**: Identifies dataset category
-- **SFNColumnMappingAgent**: Generates column mapping suggestions
-- **SFNDataLoader**: Handles data import
-- **SFNDataPostProcessor**: Manages data export
+- **SFNFieldMappingAgent**: Identifies critical fields
+- **FeatureClassificationAgent**: Analyzes and classifies features
+- **SFNMethodSuggesterAgent**: Suggests appropriate selection methods
+- **SFNFeatureSelectionExecutorAgent**: Executes selection methods
+- **SFNFeatureRecommenderAgent**: Provides final recommendations
 - **StreamlitView**: Manages user interface
 - **SFNSessionManager**: Handles application state
 
@@ -101,28 +110,22 @@ The application follows a modular architecture with these key components:
 - Safe data processing
 - Environment variable management
 
-## 📊 Mapping Features
+## 📊 Selection Methods
 
-The tool supports mapping for various data categories:
+### Methods Without Target
+- Variance threshold
+- Quasi-constant removal
+- Correlation analysis (Pearson, Spearman, Kendall)
+- Missing value analysis
+- Cardinality checks
 
-### Billing Columns
-- Revenue metrics
-- Customer information
-- Contract details
-- Product information
-- Pricing data
-
-### Usage Columns
-- License metrics
-- Feature usage
-- Activity tracking
-- User engagement
-
-### Support Columns
-- Ticket information
-- Response metrics
-- Customer satisfaction
-- Case management
+### Methods With Target
+- Chi-square test
+- ANOVA F-test
+- Mutual information
+- Information value
+- Target correlation analysis
+- Model-based importance (Random Forest, XGBoost)
 
 ## 📝 License
 
