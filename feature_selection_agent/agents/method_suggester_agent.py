@@ -109,7 +109,6 @@ class SFNMethodSuggesterAgent(SFNAgent):
             configuration=configuration,
             model=provider_config['model']
         )
-        print('>>>>>>response of method suggester agent', response) #temp
         # Handle response based on provider
         try:
             if isinstance(response, dict):  # For Cortex
@@ -117,8 +116,7 @@ class SFNMethodSuggesterAgent(SFNAgent):
             elif hasattr(response, 'choices'):  # For OpenAI
                 content = response.choices[0].message.content
             else:  # For other providers or direct string response
-                content = response
-            print('>>>>>>content of method suggester agent', content) #temp                
+                content = response               
             # Clean the response string to extract only the JSON content
             cleaned_str = content.strip()
             # Remove markdown code block markers if present

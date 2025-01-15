@@ -47,9 +47,9 @@ class SFNFeatureRecommenderAgent(SFNAgent):
         metadata = task.data.get('metadata', {})
         target_column = task.data.get('target_column')
         
-        total_features = len(test_results)
+        total_features = task.data.get('dataframe').shape[1]
         feature_count = task.data.get('feature_count', int(total_features * 0.6))
-        
+        print(f">>>>>Total features: {total_features}, Feature count: {feature_count}")
         recommendations = self._get_recommendations(
             test_results=test_results,
             metadata=metadata,
@@ -100,7 +100,7 @@ class SFNFeatureRecommenderAgent(SFNAgent):
             configuration=configuration,
             model=provider_config['model']
         )
-        print(">>> Response of Feature Recommender Agent:", response)  # temp
+
         # Handle response
         try:
             if isinstance(response, dict):  # For Cortex
@@ -120,7 +120,6 @@ class SFNFeatureRecommenderAgent(SFNAgent):
             if start_idx != -1 and end_idx != -1:
                 cleaned_str = cleaned_str[start_idx:end_idx + 1]
             
-            print(">>> Cleaned response:", cleaned_str)  # temp
             recommendations = json.loads(cleaned_str)
             return self._validate_recommendations(recommendations, feature_count)
         except (json.JSONDecodeError, AttributeError, KeyError) as e:

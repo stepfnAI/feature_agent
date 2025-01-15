@@ -11,6 +11,10 @@ from feature_selection_agent.agents.method_suggester_agent import SFNMethodSugge
 from feature_selection_agent.agents.feature_selection_executor_agent import SFNFeatureSelectionExecutorAgent
 from feature_selection_agent.agents.feature_recommender_agent import SFNFeatureRecommenderAgent
 from feature_selection_agent.views.streamlit_views import StreamlitView
+from feature_selection_agent.agents.new_category_indentification_agent import SFNCategoryIdentificationAgent
+from feature_selection_agent.agents.new_feature_suggester import SFNFeatureSuggestionAgent
+from sfn_blueprint import SFNFeatureCodeGeneratorAgent
+from sfn_blueprint import SFNCodeExecutorAgent
 
 class FeatureSelectionApp:
     def __init__(self):
@@ -31,31 +35,47 @@ class FeatureSelectionApp:
         # Display summary of completed steps
         self._display_step_summary(current_step=2)
         
-        # Step 2: Field Mapping and Classification
+        # Step 2: Category Identification (New)
+        if not self.session.get('category_confirmed'):
+            self._handle_category_identification()
+            return
+            
+        # Display summary of completed steps
+        self._display_step_summary(current_step=3)
+        
+        # Step 3: Field Mapping and Classification
         if not self.session.get('field_mapping_complete'):
             self._handle_field_mapping()
             return
         
         # Display summary of completed steps
-        self._display_step_summary(current_step=3)
+        self._display_step_summary(current_step=4)
         
-        # Step 3: Feature Selection Methods
+        # Step 4: Feature Suggestion (New)
+        if not self.session.get('feature_suggestions_complete'):
+            self._handle_feature_suggestions()
+            return
+            
+        # Display summary of completed steps
+        self._display_step_summary(current_step=5)
+        
+        # Step 5: Feature Selection Methods
         if not self.session.get('method_selection_complete'):
             self._handle_method_selection()
             return
         
         # Display summary of completed steps
-        self._display_step_summary(current_step=4)
+        self._display_step_summary(current_step=6)
         
-        # Step 4: Final Feature Selection Interface
+        # Step 6: Final Feature Selection Interface
         if not self.session.get('feature_selection_complete'):
             self._handle_feature_selection()
             return
         
         # Display summary of completed steps
-        self._display_step_summary(current_step=5)
+        self._display_step_summary(current_step=7)
         
-        # Step 5: Post Processing
+        # Step 7: Post Processing
         if not self.session.get('post_processing_complete'):
             self._handle_post_processing()
             return
@@ -100,6 +120,7 @@ class FeatureSelectionApp:
                     self.view.delete_uploaded_file(file_path)
                     
                     self.session.set('df', df)
+                    self.session.set('initial_df', df.copy())  # Store initial dataframe
                     self.view.show_message(f"✅ Data loaded successfully. Shape: {df.shape}", "success")
                     self.view.display_subheader("Data Preview")
                     self.view.display_dataframe(df.head())
@@ -113,9 +134,321 @@ class FeatureSelectionApp:
                     self.logger.error(f"Error loading file: {e}")
                     self.view.show_message(f"❌ Error loading file: {str(e)}", "error")
 
+    def _handle_category_identification(self):
+        """Step 2: Handle category identification"""
+        self.view.display_header("Step 2: Category Identification")
+        self.view.display_markdown("---")
+
+        if not self.session.get('category_identified'):
+            with self.view.display_spinner('🤖 AI is analyzing your data to identify the category...'):
+                category_agent = SFNCategoryIdentificationAgent()
+                category_task = Task("Identify category", data={
+                    'dataframe': self.session.get('df')
+                })
+                validation_task = Task("Validate category", data={
+                    'dataframe': self.session.get('df')
+                })
+                
+                validate_and_retry_agent = SFNValidateAndRetryAgent(
+                    llm_provider=DEFAULT_LLM_PROVIDER,
+                    for_agent='category_identifier'
+                )
+                
+                identified_category, validation_message, is_valid = validate_and_retry_agent.complete(
+                    agent_to_validate=category_agent,
+                    task=category_task,
+                    validation_task=validation_task,
+                    method_name='execute_task',
+                    get_validation_params='get_validation_params',
+                    max_retries=2,
+                    retry_delay=3.0
+                )
+                
+                if is_valid:
+                    self.session.set('identified_category', identified_category)
+                    self.session.set('category_identified', True)
+                else:
+                    self.view.show_message("❌ AI couldn't identify category.", "error")
+                    self.view.show_message(validation_message, "warning")
+                    return
+
+        # Show AI suggestion and get user confirmation
+        if self.session.get('category_identified') and not self.session.get('category_confirmed'):
+            self.view.show_message(f"🎯 AI suggested category: **{self.session.get('identified_category')}**", "info")
+            
+            correct_category = self.view.radio_select(
+                "Is this correct?",
+                ["Select an option", "Yes", "No"],
+                key="category_confirmation"
+            )
+
+            if correct_category == "Yes":
+                if self.view.display_button("Confirm AI Suggestion"):
+                    self.session.set('category', self.session.get('identified_category'))
+                    self.session.set('category_confirmed', True)
+                    self.view.rerun_script()
+
+            elif correct_category == "No":
+                category_choices = ['Billing', 'Support', 'Usage', 'Combined']
+                user_choice = self.view.radio_select("Please select the correct category:", category_choices)
+                
+                if self.view.display_button("Confirm Selected Category"):
+                    self.session.set('category', user_choice)
+                    self.session.set('category_confirmed', True)
+                    self.view.rerun_script()
+
+    def _handle_feature_suggestions(self):
+        """Step 4: Handle feature suggestions"""
+        self.view.display_header("Step 4: Feature Suggestions")
+        self.view.display_markdown("---")
+
+        if not self.session.get('suggestions_generated'):
+            with self.view.display_spinner('🤖 AI is analyzing your data for feature suggestions...'):
+                suggester = SFNFeatureSuggestionAgent()
+                suggest_task = Task("Generate suggestions", data={
+                    'df': self.session.get('df'),
+                    'category': self.session.get('category')
+                })
+                validation_task = Task("Validate suggestions", data={
+                    'df': self.session.get('df'),
+                    'category': self.session.get('category')
+                })
+                
+                validate_and_retry_agent = SFNValidateAndRetryAgent(
+                    llm_provider=DEFAULT_LLM_PROVIDER,
+                    for_agent='feature_suggester'
+                )
+                
+                suggestions, validation_message, is_valid = validate_and_retry_agent.complete(
+                    agent_to_validate=suggester,
+                    task=suggest_task,
+                    validation_task=validation_task,
+                    method_name='execute_task',
+                    get_validation_params='get_validation_params',
+                    max_retries=2,
+                    retry_delay=3.0
+                )
+                
+                if is_valid:
+                    self.session.set('suggestions', suggestions)
+                    self.session.set('suggestions_generated', True)
+                    self.session.set('applied_suggestions', set())
+                    self.session.set('suggestion_history', [])
+                    self.session.set('application_mode', None)  # Added for UI flow control
+                else:
+                    self.view.show_message("❌ AI couldn't generate valid suggestions.", "error")
+                    self.view.show_message(validation_message, "warning")
+                    return
+
+        # Process suggestions
+        suggestions = self.session.get('suggestions', [])
+        total_suggestions = len(suggestions)
+
+        if total_suggestions > 0:
+            # Application mode selection
+            if self.session.get('application_mode') is None:
+                self.view.show_message(f"🎯 We have generated **{total_suggestions}** suggestions for your dataset.", "info")
+                col1, col2 = self.view.create_columns(2)
+                with col1:
+                    if self.view.display_button("Review One by One"):
+                        self.session.set('application_mode', 'individual')
+                        self.view.rerun_script()
+                with col2:
+                    if self.view.display_button("Apply All at Once"):
+                        self.session.set('application_mode', 'batch')
+                        self.view.rerun_script()
+
+            # Individual Review Mode
+            elif self.session.get('application_mode') == 'individual':
+                applied_count = len(self.session.get('applied_suggestions', set()))
+                self.view.load_progress_bar(applied_count / total_suggestions)
+                self.view.show_message(f"Progress: {applied_count} of {total_suggestions} suggestions processed")
+
+                current_index = self.session.get('current_suggestion_index', 0)
+                
+                # Show all suggestions with their status
+                self.view.display_subheader("Suggestions Overview")
+                for idx, suggestion in enumerate(suggestions):
+                    if idx == current_index:
+                        self.view.show_message(f"📍 Current: {suggestion}", "info")
+                    elif idx in self.session.get('applied_suggestions', set()):
+                        history_item = next((item for item in self.session.get('suggestion_history', []) 
+                                        if item['content'] == suggestion), None)
+                        if history_item:
+                            if history_item['status'] == 'applied':
+                                self.view.show_message(f"✅ Applied: {suggestion}", "success")
+                            elif history_item['status'] == 'failed':
+                                self.view.show_message(f"❌ Failed: {suggestion}", "error")
+                            elif history_item['status'] == 'skipped':
+                                self.view.show_message(f"⏭️ Skipped: {suggestion}", 'warning')
+
+                if current_index < total_suggestions:
+                    current_suggestion = suggestions[current_index]
+                    self.view.display_subheader("Current Suggestion")
+                    self.view.show_message(f"```{current_suggestion}```", "info")
+
+                    col1, col2, col3 = self.view.create_columns(3)
+                    with col1:
+                        if self.view.display_button("Apply This Suggestion"):
+                            with self.view.display_spinner('Applying suggestion...'):
+                                try:
+                                    code_generator = SFNFeatureCodeGeneratorAgent(llm_provider=DEFAULT_LLM_PROVIDER)  # Fixed: Added llm_provider
+                                    code_executor = SFNCodeExecutorAgent()
+                                    
+                                    task = Task(
+                                        description="Generate code",
+                                        data={
+                                            'suggestion': current_suggestion,
+                                            'columns': self.session.get('df').columns.tolist(),
+                                            'dtypes': self.session.get('df').dtypes.to_dict(),
+                                            'sample_records': self.session.get('df').head().to_dict()
+                                        }
+                                    )
+                                    code = code_generator.execute_task(task)
+                                    exec_task = Task(description="Execute code", data=self.session.get('df'), code=code)
+                                    self.session.set('df', code_executor.execute_task(exec_task))
+                                    
+                                    self.session.get('applied_suggestions').add(current_index)
+                                    self.session.get('suggestion_history').append({
+                                        'type': 'suggestion',
+                                        'content': current_suggestion,
+                                        'status': 'applied',
+                                        'message': 'Successfully applied'
+                                    })
+                                    self.session.set('current_suggestion_index', current_index + 1)
+                                    self.view.rerun_script()
+                                except Exception as e:
+                                    self.view.show_message(f"Failed to apply suggestion: {str(e)}", "error")
+                                    self.session.get('applied_suggestions').add(current_index)
+                                    self.session.get('suggestion_history').append({
+                                        'type': 'suggestion',
+                                        'content': current_suggestion,
+                                        'status': 'failed',
+                                        'message': str(e)
+                                    })
+                                    self.session.set('current_suggestion_index', current_index + 1)
+                                    self.view.rerun_script()
+
+                    with col2:
+                        if self.view.display_button("Skip"):
+                            self.session.get('applied_suggestions').add(current_index)
+                            self.session.get('suggestion_history').append({
+                                'type': 'suggestion',
+                                'content': current_suggestion,
+                                'status': 'skipped',
+                                'message': 'Skipped by user'
+                            })
+                            self.session.set('current_suggestion_index', current_index + 1)
+                            self.view.rerun_script()
+
+                    with col3:
+                        remaining = total_suggestions - (applied_count + 1)
+                        if remaining > 0 and self.view.display_button(f"Apply Remaining ({remaining})"):
+                            self.session.set('application_mode', 'batch')
+                            self.view.rerun_script()
+
+            # Batch Mode
+            elif self.session.get('application_mode') == 'batch':
+                progress_bar = self.view.load_progress_bar(0)
+                status_text = self.view.make_empty()
+                
+                # Display all suggestions with processing status
+                self.view.display_subheader("Processing Suggestions")
+                
+                for i, suggestion in enumerate(suggestions):
+                    if i not in self.session.get('applied_suggestions', set()):
+                        status_text.text(f"Processing suggestion {i+1} of {total_suggestions}")
+                        try:
+                            code_generator = SFNFeatureCodeGeneratorAgent(llm_provider=DEFAULT_LLM_PROVIDER)  # Fixed: Added llm_provider
+                            code_executor = SFNCodeExecutorAgent()
+                            
+                            task = Task(
+                                description="Generate code",
+                                data={
+                                    'suggestion': suggestion,
+                                    'columns': self.session.get('df').columns.tolist(),
+                                    'dtypes': self.session.get('df').dtypes.to_dict(),
+                                    'sample_records': self.session.get('df').head().to_dict()
+                                }
+                            )
+                            code = code_generator.execute_task(task)
+                            exec_task = Task(description="Execute code", data=self.session.get('df'), code=code)
+                            self.session.set('df', code_executor.execute_task(exec_task))
+                            
+                            self.session.get('applied_suggestions').add(i)
+                            self.session.get('suggestion_history').append({
+                                'type': 'suggestion',
+                                'content': suggestion,
+                                'status': 'applied',
+                                'message': 'Successfully applied'
+                            })
+                            self.view.show_message(f"✅ Applied: {suggestion}", "success")
+                        except Exception as e:
+                            self.session.get('applied_suggestions').add(i)
+                            self.session.get('suggestion_history').append({
+                                'type': 'suggestion',
+                                'content': suggestion,
+                                'status': 'failed',
+                                'message': str(e)
+                            })
+                            self.view.show_message(f"❌ Failed: {suggestion} - Error: {str(e)}", "error")
+                        
+                        progress_bar.progress((len(self.session.get('applied_suggestions', set()))) / total_suggestions)
+                    else:
+                        history_item = next((item for item in self.session.get('suggestion_history', []) 
+                                        if item['content'] == suggestion), None)
+                        if history_item:
+                            if history_item['status'] == 'applied':
+                                self.view.show_message(f"✅ Applied: {suggestion}", "success")
+                            elif history_item['status'] == 'failed':
+                                self.view.show_message(f"❌ Failed: {suggestion}", "error")
+                            elif history_item['status'] == 'skipped':
+                                self.view.show_message(f"⏭️ Skipped: {suggestion}", 'warning')
+
+                status_text.text("All suggestions processed")
+
+            # Show summary if all suggestions are processed
+            if len(self.session.get('applied_suggestions', set())) == total_suggestions:
+                # Generate metadata after all features are added
+                if not self.session.get('classification_done'):
+                    with self.view.display_spinner('Classifying features...'):
+                        classifier = FeatureClassificationAgent()
+                        critical_fields = [v for v in self.session.get('field_mappings').values() if v is not None]
+                        features_for_classification = [col for col in self.session.get('df').columns if col not in critical_fields]
+                        classification_task = Task("Classify features", 
+                                                data=self.session.get('df')[features_for_classification])
+                        classifications, metadata = classifier.execute_task(classification_task)
+                        
+                        # Round metadata values to 4 decimal places
+                        for feature in metadata:
+                            for metric, value in metadata[feature].items():
+                                if isinstance(value, float):
+                                    metadata[feature][metric] = round(value, 4)
+                        
+                        self.session.set('feature_classifications', classifications)
+                        self.session.set('feature_metadata', metadata)
+                        self.session.set('classification_done', True)
+                
+                self.view.show_message("🎉 All suggestions have been processed!", "success")
+                history = self.session.get('suggestion_history', [])
+                applied = len([s for s in history if s['status'] == 'applied'])
+                failed = len([s for s in history if s['status'] == 'failed'])
+                skipped = len([s for s in history if s['status'] == 'skipped'])
+                
+                self.view.show_message(f"""
+                ### Summary
+                - ✅ Successfully applied: {applied}
+                - ❌ Failed: {failed}
+                - ⏭️ Skipped: {skipped}
+                """)
+                
+                if self.view.display_button("Continue to Next Step"):
+                    self.session.set('feature_suggestions_complete', True)
+                    self.view.rerun_script()
+
     def _handle_field_mapping(self):
-        """Step 2: Handle field mapping and classification"""
-        self.view.display_header("Step 2: Field Mapping and Classification")
+        """Step 3: Handle field mapping and classification"""
+        self.view.display_header("Step 3: Field Mapping and Classification")
         self.view.display_markdown("---")
         
         df = self.session.get('df')
@@ -157,23 +490,7 @@ class FeatureSelectionApp:
             self._display_mapping_interface()
             return
 
-        # Only proceed with classification after mapping is verified
-        if not self.session.get('classification_done'):
-            with self.view.display_spinner('Classifying features...'):
-                classifier = FeatureClassificationAgent()
-                # Get verified critical fields
-                critical_fields = [v for v in self.session.get('field_mappings').values() if v is not None]
-                # Filter DataFrame to exclude critical fields
-                features_for_classification = [col for col in df.columns if col not in critical_fields]
-                classification_task = Task("Classify features", 
-                                        data=df[features_for_classification])
-                classifications, metadata = classifier.execute_task(classification_task)
-                
-                self.session.set('feature_classifications', classifications)
-                self.session.set('feature_metadata', metadata)
-                self.session.set('classification_done', True)
-
-        if self.session.get('mapping_verified') and self.session.get('classification_done'):
+        if self.session.get('mapping_verified'):
             if self.view.display_button("Continue to Next Step"):
                 self.session.set('field_mapping_complete', True)
                 self.view.rerun_script()
@@ -214,8 +531,8 @@ class FeatureSelectionApp:
             
         else:  # Select Columns Manually
             # Required fields
-            required_fields = ["CUST_ID", "BILLING_DATE", "REVENUE"]
-            optional_fields = ["TARGET", "PRODUCT"]
+            required_fields = ["CUST_ID", "DATE_FIELD"]
+            optional_fields = ["TARGET", "PRODUCT", "REVENUE"]
             
             modified_mappings = {}
             
@@ -274,8 +591,8 @@ class FeatureSelectionApp:
                     self.view.rerun_script()
 
     def _handle_method_selection(self):
-        """Step 3: Handle feature selection method suggestions and selection"""
-        self.view.display_header("Step 3: Feature Selection Methods")
+        """Step 5: Handle feature selection method suggestions and selection"""
+        self.view.display_header("Step 5: Feature Selection Methods")
         self.view.display_markdown("---")
         
         # Get method suggestions if not already done
@@ -350,14 +667,23 @@ class FeatureSelectionApp:
                 executor = SFNFeatureSelectionExecutorAgent()
                 execution_task = Task("Execute methods", data={
                     'dataframe': self.session.get('df'),
-                    'methods': selected_method_info,  # Pass the full method info
+                    'methods': selected_method_info,
                     'field_mappings': self.session.get('field_mappings'),
                     'metadata': self.session.get('feature_metadata')
                 })
                 
                 print(">>> Executing feature selection methods with task:", execution_task.data)  # temp
                 test_results = executor.execute_task(execution_task)
-                print(">>> Feature selection test results:", test_results)  # temp
+                
+                # Round test result values to 4 decimal places
+                for feature in test_results:
+                    for method, values in test_results[feature].items():
+                        if isinstance(values, float):
+                            test_results[feature][method] = round(values, 4)
+                        elif isinstance(values, dict):
+                            for metric, value in values.items():
+                                if isinstance(value, float):
+                                    test_results[feature][method][metric] = round(value, 4)
                 
                 self.session.set('test_results', test_results)
                 self.view.show_message("✅ Feature selection methods executed successfully", "success")
@@ -372,8 +698,8 @@ class FeatureSelectionApp:
                 #     return
 
     def _handle_feature_selection(self):
-        """Step 4: Handle final feature selection interface"""
-        self.view.display_header("Step 4: Feature Selection")
+        """Step 6: Handle final feature selection interface"""
+        self.view.display_header("Step 6: Feature Selection")
         self.view.display_markdown("---")
         
         # Get feature recommendations if not done
@@ -420,7 +746,6 @@ class FeatureSelectionApp:
                     retry_delay=3.0
                 )
                 
-                print(">>> Recommendations received:", recommendations)  # temp
                 print(">>> Validation message:", validation_message)  # temp
                 print(">>> Is valid:", is_valid)  # temp
                 
@@ -441,8 +766,8 @@ class FeatureSelectionApp:
         self._display_feature_selection_interface()
 
     def _handle_post_processing(self):
-        """Step 5: Handle post processing and output"""
-        self.view.display_header("Step 5: Post Processing")
+        """Step 7: Handle post processing and output"""
+        self.view.display_header("Step 7: Post Processing")
         self.view.display_markdown("---")
         
         # Create final dataset with selected features
@@ -544,10 +869,14 @@ class FeatureSelectionApp:
         
         self.view.display_subheader("Feature Recommendations")
         
-        # Display summary
+        # Display summary but calculate counts from actual data
         summary = recommendations["summary"]
         self.view.display_markdown(f"**Selection Summary**: {summary['selection_criteria']}")
-        self.view.display_markdown(f"Selected {summary['selected_count']} out of {summary['total_features']} features")
+        
+        # Calculate actual counts from recommendations
+        total_features = len(recommendations["recommendations"])
+        selected_count = len([rec for rec in recommendations["recommendations"] if rec["selected"]])
+        self.view.display_markdown(f"Selected {selected_count} out of {total_features} features")
         
         # Create DataFrame for the table
         table_data = []
@@ -624,16 +953,24 @@ class FeatureSelectionApp:
             if self.session.get('data_upload_complete'):
                 self.view.display_header("Step 1: Data Upload and Preview")
                 self.view.display_markdown("---")
-                df = self.session.get('df')
-                self.view.show_message(f"✅ Data loaded successfully. **Shape: {df.shape}**", "success")
+                initial_df = self.session.get('initial_df')  # Use initial dataframe for summary
+                self.view.show_message(f"✅ Data loaded successfully. **Shape: {initial_df.shape}**", "success")
                 self.view.display_subheader("Data Preview")
-                self.view.display_dataframe(df.head())
+                self.view.display_dataframe(initial_df.head())
                 self.view.display_markdown("---")
         
         if current_step == 3:
-            # Step 2 Summary (Field Mapping)
+            # Step 2 Summary (Category Identification)
+            if self.session.get('category_confirmed'):
+                self.view.display_header("Step 2: Category Identification")
+                message = "✅ Category identified successfully"
+                self.view.show_message(message, "success")
+                self.view.display_markdown("---")
+        
+        if current_step == 4:
+            # Step 3 Summary (Field Mapping)
             if self.session.get('field_mapping_complete'):
-                self.view.display_header("Step 2: Critical Field Mappings")
+                self.view.display_header("Step 3: Critical Field Mappings")
                 message = "✅ Critical Fields Mapped Successfully:\n"
                 field_mappings = self.session.get('field_mappings')
                 for field, mapped_col in field_mappings.items():
@@ -641,10 +978,43 @@ class FeatureSelectionApp:
                 self.view.show_message(message, "success")
                 self.view.display_markdown("---")
         
-        if current_step == 4:
-            # Step 3 Summary (Method Selection)
+        if current_step == 5:
+            # Step 4 Summary (Feature Suggestion)
+            if self.session.get('feature_suggestions_complete'):
+                self.view.display_header("Step 4: Feature Suggestions")
+                
+                # Get suggestion history and counts
+                history = self.session.get('suggestion_history', [])
+                applied = len([s for s in history if s['status'] == 'applied'])
+                failed = len([s for s in history if s['status'] == 'failed'])
+                skipped = len([s for s in history if s['status'] == 'skipped'])
+                
+                # Show all suggestions with their status
+                for item in history:
+                    if item['status'] == 'applied':
+                        self.view.show_message(f"✅ Applied: {item['content']}", "success")
+                    elif item['status'] == 'failed':
+                        self.view.show_message(f"❌ Failed: {item['content']} - {item['message']}", "error")
+                    elif item['status'] == 'skipped':
+                        self.view.show_message(f"⏭️ Skipped: {item['content']}", "warning")
+                
+                # Show summary counts
+                self.view.show_message(f"""
+                #### Summary
+                - ✅ Successfully applied: {applied}
+                - ❌ Failed: {failed}
+                - ⏭️ Skipped: {skipped}
+                
+                #### Data Shape Changes
+                - Initial shape: {self.session.get('initial_df').shape}
+                - Current shape: {self.session.get('df').shape}
+                """, "success")
+                self.view.display_markdown("---")
+        
+        if current_step == 6:
+            # Step 5 Summary (Method Selection)
             if self.session.get('method_selection_complete'):
-                self.view.display_header("Step 3: Feature Selection Methods")
+                self.view.display_header("Step 5: Feature Selection Methods")
                 selected_methods = self.session.get('selected_methods', [])
                 message = "✅ Selected Feature Selection Methods:\n"
                 for method in selected_methods:
@@ -652,10 +1022,10 @@ class FeatureSelectionApp:
                 self.view.show_message(message, "success")
                 self.view.display_markdown("---")
         
-        if current_step == 5:
-            # Step 4 Summary (Feature Selection)
+        if current_step == 7:
+            # Step 6 Summary (Feature Selection)
             if self.session.get('feature_selection_complete'):
-                self.view.display_header("Step 4: Feature Selection")
+                self.view.display_header("Step 6: Feature Selection")
                 recommendations = self.session.get('recommendations')
                 selected_features = [rec["feature_name"] for rec in recommendations["recommendations"] 
                                if rec["selected"]]

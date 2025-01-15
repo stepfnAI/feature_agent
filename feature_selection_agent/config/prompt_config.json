@@ -3,7 +3,7 @@
         "openai": {
             "main": {
                 "system_prompt": "You are a data analysis expert specializing in identifying critical fields in datasets. Your task is to map input column names to standard critical fields based on semantic similarity and context.",
-                "user_prompt_template": "Map the following input columns to these critical fields: CUST_ID (customer identifier), BILLING_DATE (date field), REVENUE (revenue/amount field), and TARGET (optional target variable for prediction).\n\nInput columns: {columns}\n\nProvide the mapping in JSON format with these exact keys: 'customer_id', 'date_mapping', 'revenue_mapping', 'target'. Use null if no suitable match is found.\n\nExample response format:\n{{\n    \"customer_id\": \"customer_identifier\",\n    \"date_mapping\": \"transaction_date\",\n    \"revenue_mapping\": \"amount\",\n    \"target\": null\n}}"
+                "user_prompt_template": "Map the following input columns to these standard critical fields: CUST_ID (customer identifier), DATE_FIELD (date field), REVENUE (optional revenue/amount field), and TARGET (optional target variable for prediction).\n\nInput columns: {columns}\n\nIMPORTANT: You must ONLY suggest columns that are present in the input columns list above. Do not suggest any column names that are not in the provided list.\n\nProvide the mapping in JSON format with these exact keys: 'customer_id', 'date_mapping', 'revenue_mapping', 'target'. Use null if no suitable match is found in the input columns.\n\nExample response format:\n{{\n    \"customer_id\": \"customer_identifier\",\n    \"date_mapping\": \"transaction_date\", \n    \"revenue_mapping\": \"amount\",\n    \"target\": null\n}}\n\nRemember: Only suggest columns from the provided input columns list. Double check that any column you suggest exists in the input columns."
             },
             "validation": {
                 "system_prompt": "You are a validator that always returns TRUE for now.",
@@ -26,12 +26,56 @@
     "feature_recommender": {
         "openai": {
             "main": {
-                "system_prompt": "You are a sophisticated feature selection expert who provides comprehensive feature recommendations based on multiple criteria. Your analysis should consider statistical significance, business relevance, and practical utility of each feature. Consider relationships between features, their predictive power, and their business context when making recommendations.",
-                "user_prompt_template": "Analyze these feature selection test results and recommend features to keep. Consider multiple aspects including but not limited to:\n- Statistical metrics from test results\n- Business relevance and interpretability\n- Relationships with other features\n- Data quality aspects\n- Potential predictive power\n\nTest Results:\n{test_results}\n\nFeature Metadata:\n{metadata}\n\nTarget Variable: {target_column}\nTarget Feature Count: {feature_count} (this is a guideline, not a strict limit)\n\nProvide recommendations in JSON format:\n{{\n    \"recommendations\": [\n        {{\n            \"feature_name\": str,\n            \"status\": \"R|G|Y\",  # Red: Not Recommended, Green: Highly Recommended, Yellow: Consider with Caution\n            \"explanation\": \"consise explanation in 1-2 lines considering multiple factors: statistical significance, business value, data quality, and relationships with other features. Be specific about why this feature is valuable or problematic.\",\n            \"priority\": \"high|medium|low\",\n            \"selected\": bool\n        }}\n    ],\n    \"summary\": {{\n        \"total_features\": int,\n        \"selected_count\": int,\n        \"selection_criteria\": \"Detailed explanation of the overall selection strategy, including key factors considered and trade-offs made\"\n    }}\n}}\n\nEnsure explanations:\n1. Are specific to each feature's characteristics\n2. Consider multiple evaluation criteria\n3. Mention relevant statistical measures\n4. Include business context where applicable\n5. Discuss relationships with other features\n6. Address both strengths and potential limitations"
+                "system_prompt": "You are a sophisticated feature selection expert who provides comprehensive feature recommendations based on multiple criteria. Your task is to analyze ALL features in the dataset without exception. Your analysis should consider statistical significance, business relevance, and practical utility of each feature. Consider relationships between features, their predictive power, and their business context when making recommendations.",
+                "user_prompt_template": "Analyze ALL features in the test results and metadata. You must provide analysis for EACH feature without exception. Recommend the top {feature_count} most valuable features to keep (a feature is recommended when selected flag is set True.) Your goal is to identify the optimal subset of features that provides the most predictive power and business value while maintaining model simplicity. Consider multiple aspects including but not limited to:\n- Statistical metrics from test results\n- Business relevance and interpretability\n- Relationships with other features\n- Data quality aspects\n- Potential predictive power\n\nTest Results:\n{test_results}\n\nFeature Metadata:\n{metadata}\n\nTarget Variable: {target_column}\n\nProvide recommendations in JSON format:\n{{\n    \"recommendations\": [\n        {{\n            \"feature_name\": str,\n            \"status\": \"R|G|Y\",  # Red: Not Recommended, Green: Highly Recommended, Yellow: Consider with Caution\n            \"explanation\": \"consise explanation in 10-15 words considering multiple factors: statistical significance, business value, data quality, and relationships with other features. Be specific about why this feature is valuable or problematic.\",\n            \"priority\": \"high|medium|low\",\n            \"selected\": bool  # try to select around {feature_count} top features\n        }}\n    ],\n    \"summary\": {{\n        \"total_features\": int,\n        \"selected_count\": int,\n        \"selection_criteria\": \"Detailed explanation of the overall selection strategy, including key factors considered and trade-offs made\"\n    }}\n}}\n\nEnsure explanations:\n1. Are specific to each feature's characteristics\n2. Consider multiple evaluation criteria\n3. Mention relevant statistical measures\n4. Include business context where applicable\n5. Discuss relationships with other features\n6. Address both strengths and potential limitations\n\nIMPORTANT: You MUST analyze and provide recommendations for ALL features in the test results and metadata. Do not skip any features."
             },
             "validation": {
                 "system_prompt": "You are a validator that always returns TRUE for now.",
                 "user_prompt_template": "Validate the following feature recommendations:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        }
+    },
+    "category_identifier": {
+        "openai": {
+            "main": {
+                "system_prompt": "You are a data analysis expert specializing in categorizing SaaS datasets. Your task is to categorize datasets based on column names, prioritizing specific categories when possible.",
+                "user_prompt_template": "This dataset comes from a SaaS business and may fall into one of these categories: billing (e.g., invoices, transactions, financial records), support (e.g., customer service tickets, response times, etc), usage (e.g., feature usage, user activity metrics), or other. Choose billing, support, or usage when one category is clearly dominant. suggest combined only if there is a significant mix of features belonging to multiple categories for eg more then 5 features of billing, support, or usage. Try to suggest a category among billing, support, or usage that is most relevant to the dataset. Based on the following column names, choose the best category: {columns}. Respond with only the category name."
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following category identification:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        },
+        "anthropic": {
+            "main": {
+                "system_prompt": "You are a data analysis expert. Your task is to categorize datasets based on their column names.",
+                "user_prompt_template": "Based on the following column names, categorize the dataset into one of these categories: billing, usage, support, combined, or other.Column names: {columns} Please respond with just the category name, nothing else."
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following category identification:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        }
+    },
+    "feature_suggester": {
+        "openai": {
+            "main": {
+                "system_prompt": "You are a data science expert specializing in feature engineering and data quality improvement.",
+                "user_prompt_template": "As a data science expert, analyze the following dataset and provide suggestions for feature engineering and data quality improvement. Dataset Category: {category} Columns: {columns} Sample Records: {samples} Statistical Description: {describe} Based on this information, suggest features or transformations that could improve the dataset for analysis or machine learning tasks. Consider the following and generate suggestions based on its applicability: 1. Relevant derived features based on the identified category ({category}) 2. Potential data quality issues and how to address them 3. Possible feature combinations or interactions 4. Numerical transformations (e.g., normalization, binning) 5. Categorical encoding techniques - IMPORTANT: For high-cardinality columns (>50 unique values), suggest alternative encoding methods like target encoding or frequency encoding instead of one-hot encoding 6. Time-based features (if applicable) 7. Text processing techniques (if applicable) Provide each suggestion as a separate item in a numbered list. Focus on practical steps to improve the data quality and create meaningful features. TRY TO PROVIDE SUGGESTIONS MENTIONING THE COLUMN NAME/S INVOLVED. DO NOT DUPLICATE SUGGESTIONS. DO NOT PROVIDE HEADINGS. DO NOT PROVIDE GENERIC SUGGESTIONS. ONLY PROVIDE A LIST OF SUGGESTIONS SEPARATED BY NEWLINES. AVOID SUGGESTIONS THAT COULD CREATE MORE THAN 50 NEW COLUMNS."
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following feature suggestions:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
+            }
+        },
+        "anthropic": {
+            "main": {
+                "system_prompt": "You are a data science expert specializing in feature engineering and data quality improvement.",
+                "user_prompt_template": "As a data science expert, analyze the following \n dataset and provide suggestions for feature engineering and data quality improvement.\n Dataset Category: {category} \n Columns: {columns} \n Sample Records: {samples} \n Statistical Description: {describe} \n  Based on this information, suggest features or transformations that could improve the dataset for analysis or machine learning tasks. Consider the following: 1. Relevant derived features based on the identified category ({category}) 2. Potential data quality issues and how to address them 3. Possible feature combinations or interactions 4. Numerical transformations (e.g., normalization, binning) 5. Categorical encoding techniques 6. Time-based features (if applicable) 7. Text processing techniques (if applicable) Provide each suggestion as a separate item in a numbered list. Focus on practical steps to improve the data quality and create meaningful features. DO NOT DUPLICATE SUGGESTIONS. DO NOT PROVIDE HEADINGS. ONLY PROVIDE A LIST OF SUGGESTIONS separated by newlines."
+            },
+            "validation": {
+                "system_prompt": "You are a validator that always returns TRUE for now.",
+                "user_prompt_template": "Validate the following feature suggestions:\n{actual_output}\n\nFor now, always respond with JUST 'TRUE' on the first line and nothing else."
             }
         }
     }

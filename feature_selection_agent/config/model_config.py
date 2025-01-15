@@ -31,3 +31,24 @@ MODEL_CONFIG["feature_recommender"] = {
         "stop": None
     }
 } 
+
+
+MODEL_CONFIG["category_identifier"] = {
+    "openai": {
+        "model": "gpt-4o-mini", #"gpt-3.5-turbo",
+        "temperature": 0.7,
+        "max_tokens": 100,
+        "n": 1,
+        "stop": None
+    }
+}
+
+MODEL_CONFIG["feature_suggester"] = {
+    "openai": {
+        "model": "gpt-4o-mini", #"gpt-3.5-turbo",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "n": 1,
+        "stop": None
+    }
+}
