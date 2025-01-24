@@ -9,7 +9,7 @@ authors = [
   { name="StepFN AI" },
 ]
 description = "An AI-powered feature selection agent for automated data analysis and feature selection"
-readme = "README.md"
+readme = "readme.md"
 requires-python = ">=3.9,<3.12"
 
 dependencies = [
